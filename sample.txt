@@ -1,0 +1,7 @@
+Trí tuệ nhân tạo (AI) đang phát triển với tốc độ nhanh chóng và mở ra nhiều ứng dụng hữu ích trong cuộc sống hàng ngày.
+Một trong những lĩnh vực nổi bật là công nghệ chuyển đổi văn bản thành giọng nói (Text-to-Speech).
+
+Nhờ các mô hình nơ-ron học sâu (Deep Neural Networks), giọng đọc nhân tạo ngày nay đã đạt được độ tự nhiên đáng kinh ngạc, có ngữ điệu, nhịp thở và cảm xúc chân thực như người thật đọc.
+
+Ứng dụng này giúp bạn dễ dàng chuyển các đoạn tài liệu dài, bài viết blog, hoặc tiểu thuyết thành sách nói (Audiobook) chất lượng cao mà không tốn bất kỳ chi phí nào.
+Chúc bạn có những trải nghiệm tuyệt vời với ứng dụng!
