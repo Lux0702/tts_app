@@ -446,11 +446,17 @@ SAMPLE_VI_TEXT = (
 
 
 # ---------------- CÁC HÀM HỆ THỐNG & AI ----------------
+def run_async_coroutine(coro):
+    """Chạy coroutine async an toàn trong thread riêng để tránh xung đột event loop của Streamlit."""
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(asyncio.run, coro).result()
+
+
 @st.cache_data(ttl=3600)
 def get_all_available_voices():
     """Lấy danh mục hơn 300+ giọng đọc của Edge TTS và phân loại theo quốc gia."""
     try:
-        raw_voices = asyncio.run(edge_tts.list_voices())
+        raw_voices = run_async_coroutine(edge_tts.list_voices())
         voices_by_locale = {}
         for v in raw_voices:
             locale = v.get("Locale", "Other")
@@ -470,7 +476,7 @@ def get_all_available_voices():
 
 
 def detect_system_hardware():
-    """Kiểm tra máy tính có card đồ họa rời NVIDIA CUDA hay không."""
+    """Kiểm tra máy tính có card đồ họa rời NVIDIA CUDA hay không (tương thích Windows & Linux Cloud)."""
     has_cuda = False
     gpu_name = "Không phát hiện card rời NVIDIA"
 
@@ -484,29 +490,34 @@ def detect_system_hardware():
     except Exception:
         pass
 
-    try:
-        res = subprocess.run(
-            [
-                "powershell",
-                "-Command",
-                "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=3,
-        )
-        controllers = [
-            c.strip() for c in res.stdout.strip().split("\n") if c.strip()
-        ]
-        for c in controllers:
-            if any(x in c.upper() for x in ["NVIDIA", "RTX", "GTX", "GEFORCE"]):
-                has_cuda = True
-                gpu_name = c
-                break
-            elif "INTEL" in c.upper() or "AMD" in c.upper():
-                gpu_name = c
-    except Exception:
-        gpu_name = "Card đồ họa tích hợp"
+    import platform
+    if platform.system() == "Windows":
+        try:
+            res = subprocess.run(
+                [
+                    "powershell",
+                    "-Command",
+                    "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            controllers = [
+                c.strip() for c in res.stdout.strip().split("\n") if c.strip()
+            ]
+            for c in controllers:
+                if any(x in c.upper() for x in ["NVIDIA", "RTX", "GTX", "GEFORCE"]):
+                    has_cuda = True
+                    gpu_name = c
+                    break
+                elif "INTEL" in c.upper() or "AMD" in c.upper():
+                    gpu_name = c
+        except Exception:
+            gpu_name = "Card đồ họa tích hợp"
+    else:
+        # Linux (Streamlit Cloud, Render, VPS)
+        gpu_name = "Hệ thống Cloud (CPU / Môi trường Container)"
 
     return has_cuda, gpu_name
 
@@ -583,12 +594,6 @@ async def generate_audio_chunk(
         if chunk["type"] == "audio":
             audio_stream.extend(chunk["data"])
     return bytes(audio_stream)
-
-
-def run_async_coroutine(coro):
-    """Chạy coroutine async an toàn trong thread riêng để tránh xung đột loop."""
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        return executor.submit(asyncio.run, coro).result()
 
 
 # ---------------- SIDEBAR: BỘ ĐIỀU KHIỂN STUDIO (SIDEBAR PRO) ----------------
