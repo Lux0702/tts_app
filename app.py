@@ -5,6 +5,8 @@ import io
 import json
 import re
 import subprocess
+import urllib.parse
+import urllib.request
 import streamlit as st
 import edge_tts
 
@@ -416,8 +418,9 @@ VOICE_STYLES = {
 }
 
 DEFAULT_VI_VOICES = {
-    "🇻🇳 Tiếng Việt - Nữ (Hoài Mỹ)": "vi-VN-HoaiMyNeural",
-    "🇻🇳 Tiếng Việt - Nam (Nam Minh)": "vi-VN-NamMinhNeural",
+    "🇻🇳 [Edge AI] Nữ - Hoài Mỹ (Tự nhiên, truyền cảm)": "vi-VN-HoaiMyNeural",
+    "🇻🇳 [Edge AI] Nam - Nam Minh (Dứt khoát, chuẩn thời sự)": "vi-VN-NamMinhNeural",
+    "🇻🇳 [Google TTS] Nữ - Chị Google (Huyền thoại, vui nhộn)": "google-vi-female",
 }
 
 POPULAR_INTL_VOICES = {
@@ -582,7 +585,21 @@ def split_into_chunks(text: str, max_chars: int = 1800) -> list[str]:
     return chunks
 
 
-async def generate_audio_chunk(
+def generate_google_tts_chunk(text: str) -> bytes:
+    """Tạo âm thanh giọng Chị Google tiếng Việt (Google Translate TTS)."""
+    encoded = urllib.parse.quote(text)
+    url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded}&tl=vi&client=tw-ob"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        },
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return resp.read()
+
+
+async def generate_edge_tts_chunk(
     text: str, voice: str, rate: str, pitch: str, volume: str
 ) -> bytes:
     """Gọi Edge-TTS để tạo âm thanh cho 1 đoạn văn bản."""
@@ -594,6 +611,18 @@ async def generate_audio_chunk(
         if chunk["type"] == "audio":
             audio_stream.extend(chunk["data"])
     return bytes(audio_stream)
+
+
+def generate_audio_chunk(
+    text: str, voice: str, rate: str, pitch: str, volume: str
+) -> bytes:
+    """Điều hướng tạo âm thanh theo nguồn giọng (Google TTS hoặc Edge TTS)."""
+    if voice == "google-vi-female":
+        return generate_google_tts_chunk(text)
+    else:
+        return run_async_coroutine(
+            generate_edge_tts_chunk(text, voice, rate, pitch, volume)
+        )
 
 
 # ---------------- SIDEBAR: BỘ ĐIỀU KHIỂN STUDIO (SIDEBAR PRO) ----------------
@@ -857,14 +886,12 @@ with main_tab1:
                     progress_text.markdown(
                         f"🔄 **Đang tổng hợp âm thanh với phong cách `{selected_style_name}`...** (Đoạn {i + 1}/{total_chunks})"
                     )
-                    chunk_audio = run_async_coroutine(
-                        generate_audio_chunk(
-                            text=chunk,
-                            voice=selected_voice,
-                            rate=speed_str,
-                            pitch=pitch_str,
-                            volume=volume_str,
-                        )
+                    chunk_audio = generate_audio_chunk(
+                        text=chunk,
+                        voice=selected_voice,
+                        rate=speed_str,
+                        pitch=pitch_str,
+                        volume=volume_str,
                     )
                     all_audio_bytes.extend(chunk_audio)
                     progress_bar.progress((i + 1) / total_chunks)
